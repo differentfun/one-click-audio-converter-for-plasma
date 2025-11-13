@@ -2,7 +2,7 @@
 
 This repo contains a KDE service menu installer that adds a Dolphin context
 menu entry for batch audio conversion. When invoked it launches a Zenity UI
-where you can pick the target format (OGG, MP3, WMA), choose a quality preset,
+where you can pick the target format (OGG, MP3, WMA, M4A), choose a quality preset,
 and monitor progress for all selected files at once.
 
 ## Features
@@ -17,7 +17,7 @@ and monitor progress for all selected files at once.
 ## Requirements
 
 - KDE Dolphin with service menus allowed (`shell_access=true`).
-- `ffmpeg` compiled with `libvorbis`, `libmp3lame`, and `wmav2`.
+- `ffmpeg` compiled with `libvorbis`, `libmp3lame`, `wmav2`, and the built-in `aac` encoder.
 - `zenity`.
 - `pkexec` and `apt-get` (only if you rely on the installer to fetch deps).
 

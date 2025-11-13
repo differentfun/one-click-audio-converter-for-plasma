@@ -135,7 +135,8 @@ choose_format() {
     --column "Select" --column "Format" --column "Description" \
     TRUE ogg "Ogg Vorbis" \
     FALSE mp3 "MP3 (LAME)" \
-    FALSE wma "Windows Media Audio"
+    FALSE wma "Windows Media Audio" \
+    FALSE m4a "AAC (M4A container)"
 }
 
 choose_quality() {
@@ -171,6 +172,16 @@ choose_quality() {
         FALSE Medium "WMA 160 kbps" \
         FALSE Low "WMA 128 kbps"
       ;;
+    m4a)
+      zenity --list \
+        --title="$TITLE" \
+        --text="Quality for AAC (M4A)." \
+        --radiolist \
+        --column "Select" --column "Preset" --column "Details" \
+        TRUE High "AAC 256 kbps" \
+        FALSE Medium "AAC 192 kbps" \
+        FALSE Low "AAC 128 kbps"
+      ;;
   esac
 }
 
@@ -202,6 +213,14 @@ case "$format" in
     case "$quality" in
       High) codec_args+=(-b:a 256k) ;;
       Medium) codec_args+=(-b:a 160k) ;;
+      Low) codec_args+=(-b:a 128k) ;;
+    esac
+    ;;
+  m4a)
+    codec_args=(-c:a aac -movflags +faststart)
+    case "$quality" in
+      High) codec_args+=(-b:a 256k) ;;
+      Medium) codec_args+=(-b:a 192k) ;;
       Low) codec_args+=(-b:a 128k) ;;
     esac
     ;;
