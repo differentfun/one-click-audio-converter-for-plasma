@@ -158,6 +158,7 @@ choose_quality() {
         --text="Quality for MP3." \
         --radiolist \
         --column "Select" --column "Preset" --column "Details" \
+        FALSE Highest "MP3 320 kbps" \
         TRUE High "MP3 256 kbps" \
         FALSE Medium "MP3 192 kbps" \
         FALSE Low "MP3 128 kbps"
@@ -203,6 +204,7 @@ case "$format" in
   mp3)
     codec_args=(-c:a libmp3lame)
     case "$quality" in
+      Highest) codec_args+=(-b:a 320k) ;;
       High) codec_args+=(-b:a 256k) ;;
       Medium) codec_args+=(-b:a 192k) ;;
       Low) codec_args+=(-b:a 128k) ;;
