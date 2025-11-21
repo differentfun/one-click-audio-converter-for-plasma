@@ -68,6 +68,7 @@ ensure_shell_access_allowed() {
 
 ensure_dependencies_installed() {
   local missing_pkgs=()
+  command -v timidity >/dev/null 2>&1 || missing_pkgs+=("timidity")
   command -v ffmpeg >/dev/null 2>&1 || missing_pkgs+=("ffmpeg")
   command -v zenity >/dev/null 2>&1 || missing_pkgs+=("zenity")
 
@@ -125,6 +126,69 @@ done
 if [[ ${#files[@]} -eq 0 ]]; then
   zenity --error --title="$TITLE" --text="No valid audio files to convert." >/dev/null 2>&1 || true
   exit 1
+fi
+
+is_midi_file() {
+  local name="${1,,}"
+  [[ "$name" == *.mid || "$name" == *.midi ]]
+}
+
+find_default_soundfont() {
+  local candidates=(
+    "$HOME/.local/share/soundfonts/default.sf2"
+    "$HOME/.local/share/soundfonts/FluidR3_GM.sf2"
+    "/usr/share/sounds/sf2/FluidR3_GM.sf2"
+    "/usr/share/sounds/sf2/FluidR3_GS.sf2"
+    "/usr/share/soundfonts/default.sf2"
+    "/usr/share/soundfonts/FluidR3_GM.sf2"
+  )
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+}
+
+ffmpeg_supports_midi() {
+  ffmpeg -hide_banner -demuxers 2>/dev/null | grep -qiE '\ssmf\b'
+}
+
+soundfont=""
+has_midi=0
+for path in "${files[@]}"; do
+  if is_midi_file "$path"; then
+    has_midi=1
+    break
+  fi
+done
+
+if (( has_midi )); then
+  soundfont="$(find_default_soundfont)"
+  if [[ -z "$soundfont" ]]; then
+    soundfont="$(zenity --file-selection --title="$TITLE" --text="Select a SoundFont (.sf2) for MIDI rendering." --file-filter="SoundFont | *.sf2" --file-filter="All files | *" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$soundfont" ]]; then
+    zenity --error --title="$TITLE" --text="No SoundFont (.sf2) available. Install e.g. the 'fluid-soundfont-gm' package or select a .sf2 file." >/dev/null 2>&1 || true
+    exit 1
+  fi
+fi
+
+midi_via_ffmpeg=0
+midi_via_timidity=0
+
+if (( has_midi )); then
+  if ffmpeg_supports_midi; then
+    midi_via_ffmpeg=1
+  elif command -v timidity >/dev/null 2>&1; then
+    midi_via_timidity=1
+  fi
+
+  if (( midi_via_ffmpeg == 0 && midi_via_timidity == 0 )); then
+    zenity --error --title="$TITLE" --text="MIDI conversion requires ffmpeg built with libfluidsynth or the 'timidity' command." >/dev/null 2>&1 || true
+    exit 1
+  fi
 fi
 
 choose_format() {
@@ -282,7 +346,22 @@ for file in "${files[@]}"; do
   echo "# Converting ${basename}" >&3
 
   out_path="$(make_unique_path "$file" "$ext")"
-  if ffmpeg -y -hide_banner -loglevel error -i "$file" "${codec_args[@]}" "$out_path"; then
+
+  if is_midi_file "$file"; then
+    if (( midi_via_ffmpeg )); then
+      if ffmpeg -y -hide_banner -loglevel error -soundfont "$soundfont" -i "$file" "${codec_args[@]}" "$out_path"; then
+        ((++converted))
+      else
+        failed+=("$basename")
+      fi
+    else
+      if timidity -Ow -o - -x "soundfont $soundfont" "$file" 2>/dev/null | ffmpeg -y -hide_banner -loglevel error -i - "${codec_args[@]}" "$out_path"; then
+        ((++converted))
+      else
+        failed+=("$basename")
+      fi
+    fi
+  elif ffmpeg -y -hide_banner -loglevel error -i "$file" "${codec_args[@]}" "$out_path"; then
     ((++converted))
   else
     failed+=("$basename")
@@ -411,7 +490,7 @@ cat <<EOF > "$target_file"
 [Desktop Entry]
 Type=Service
 X-KDE-ServiceTypes=KonqPopupMenu/Plugin
-MimeType=audio/*;audio/mpeg;audio/mp3;audio/flac;audio/x-flac;audio/aac;audio/x-aac;audio/ogg;audio/x-vorbis+ogg;audio/x-ms-wma;audio/x-wav;audio/wav;audio/x-m4a;audio/webm;
+MimeType=audio/*;audio/mpeg;audio/mp3;audio/flac;audio/x-flac;audio/aac;audio/x-aac;audio/ogg;audio/x-vorbis+ogg;audio/x-ms-wma;audio/x-wav;audio/wav;audio/x-m4a;audio/webm;audio/midi;audio/x-midi;audio/mid;audio/x-mid;
 Icon=applications-multimedia
 Actions=ConvertAudio
 X-KDE-Submenu=One-click Conversion
